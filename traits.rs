@@ -3,135 +3,79 @@ use ink::{
     primitives::AccountId,
 };
 
-use crate::errors::PSP22Error;
+use crate::data::Id;
+use crate::errors::PSP34Error;
 
 #[ink::trait_definition]
-pub trait PSP22 {
-    /// Returns the total token supply.
+pub trait PSP34 {
+    /// Returns the collection `Id` of the NFT token.
+    ///
+    /// This can represents the relationship between tokens/contracts/pallets.
+    #[ink(message)]
+    fn collection_id(&self) -> Id;
+    
+    /// Returns the current total supply of the NFT.
     #[ink(message)]
     fn total_supply(&self) -> u128;
 
     /// Returns the account balance for the specified `owner`.
     ///
-    /// Returns `0` if the account is non-existent.
+    /// This represents the amount of unique tokens the owner has.
     #[ink(message)]
     fn balance_of(&self, owner: AccountId) -> u128;
 
-    /// Returns the amount which `spender` is still allowed to withdraw from `owner`.
-    ///
-    /// Returns `0` if no allowance has been set.
+    /// Returns `true` if the operator is approved by the owner to withdraw `id` token.
+    /// 
+    /// If `id` is `None`, returns `true` if the operator is approved to withdraw all owner's tokens.
     #[ink(message)]
-    fn allowance(&self, owner: AccountId, spender: AccountId) -> u128;
+    fn allowance(&self, owner: AccountId, operator: AccountId, id: Option<Id>) -> bool;
 
-    /// Transfers `value` amount of tokens from the caller's account to account `to`
-    /// with additional `data` in unspecified format.
-    ///
-    /// # Events
+    /// Transfer approved or owned token from caller.
     ///
     /// On success a `Transfer` event is emitted.
     ///
-    /// No-op if the caller and `to` is the same address or `value` is zero, returns success
-    /// and no events are emitted.
-    ///
     /// # Errors
     ///
-    /// Reverts with `InsufficientBalance` if the `value` exceeds the caller's balance.
+    /// Returns `TokenNotExists` error if `id` does not exist.
+    ///
+    /// Returns `NotApproved` error if `from` doesn't have allowance for transferring.
+    ///
+    /// Returns `SafeTransferCheckFailed` error if `to` doesn't accept transfer.
     #[ink(message)]
-    fn transfer(&mut self, to: AccountId, value: u128, data: Vec<u8>) -> Result<(), PSP22Error>;
+    fn transfer(&mut self, to: AccountId, id: Id, data: Vec<u8>) -> Result<(), PSP34Error>;
 
-    /// Transfers `value` tokens on the behalf of `from` to the account `to`
-    /// with additional `data` in unspecified format.
-    ///
-    /// If `from` and the caller are different addresses, the caller must be allowed
-    /// by `from` to spend at least `value` tokens.
-    ///
-    /// # Events
-    ///
-    /// On success a `Transfer` event is emitted.
-    ///
-    /// No-op if `from` and `to` is the same address or `value` is zero, returns success
-    /// and no events are emitted.
-    ///
-    /// If `from` and the caller are different addresses, a successful transfer results
-    /// in decreased allowance by `from` to the caller and an `Approval` event with
-    /// the new allowance amount is emitted.
-    ///
-    /// # Errors
-    ///
-    /// Reverts with `InsufficientBalance` if the `value` exceeds the balance of the account `from`.
-    ///
-    /// Reverts with `InsufficientAllowance` if `from` and the caller are different addresses and
-    /// the `value` exceeds the allowance granted by `from` to the caller.
-    ///
-    /// If conditions for both `InsufficientBalance` and `InsufficientAllowance` errors are met,
-    /// reverts with `InsufficientAllowance`.
-    #[ink(message)]
-    fn transfer_from(
-        &mut self,
-        from: AccountId,
-        to: AccountId,
-        value: u128,
-        data: Vec<u8>,
-    ) -> Result<(), PSP22Error>;
-
-    /// Allows `spender` to withdraw from the caller's account multiple times, up to
-    /// the total amount of `value`.
-    ///
-    /// Successive calls of this method overwrite previous values.
-    ///
-    /// # Events
+    
+    /// Approves `operator` to withdraw  the `id` token from the caller's account.
+    /// If `id` is `None` approves or disapproves the operator for all tokens of the caller.
     ///
     /// An `Approval` event is emitted.
     ///
-    /// No-op if the caller and `spender` is the same address, returns success and no events are emitted.
-    #[ink(message)]
-    fn approve(&mut self, spender: AccountId, value: u128) -> Result<(), PSP22Error>;
-
-    /// Increases by `delta-value` the allowance granted to `spender` by the caller.
-    ///
-    /// # Events
-    ///
-    /// An `Approval` event with the new allowance amount is emitted.
-    ///
-    /// No-op if the caller and `spender` is the same address or `delta-value` is zero, returns success
-    /// and no events are emitted.
-    #[ink(message)]
-    fn increase_allowance(
-        &mut self,
-        spender: AccountId,
-        delta_value: u128,
-    ) -> Result<(), PSP22Error>;
-
-    /// Decreases by `delta-value` the allowance granted to `spender` by the caller.
-    ///
-    /// # Events
-    ///
-    /// An `Approval` event with the new allowance amount is emitted.
-    ///
-    /// No-op if the caller and `spender` is the same address or `delta-value` is zero, returns success
-    /// and no events are emitted.
-    ///
     /// # Errors
     ///
-    /// Reverts with `InsufficientAllowance` if `spender` and the caller are different addresses and
-    /// the `delta-value` exceeds the allowance granted by the caller to `spender`.
+    /// Returns `SelfApprove` error if it is self approve.
+    ///
+    /// Returns `NotApproved` error if caller is not owner of `id`.
     #[ink(message)]
-    fn decrease_allowance(
-        &mut self,
-        spender: AccountId,
-        delta_value: u128,
-    ) -> Result<(), PSP22Error>;
+    fn approve(&mut self, operator: AccountId, id: Option<Id>, approved: bool) -> Result<(), PSP34Error>;
+
+    /// Returns the owner of the token if any.
+    #[ink(message)]
+    fn owner_of(&self, id: Id) -> Option<AccountId>;
+
+
+
+    #[ink(message)]
+    fn mint(&mut self, id: Id) -> Result<(), PSP34Error>;
+
+    #[ink(message)]
+    fn burn(&mut self, account: AccountId, id: Id) -> Result<(), PSP34Error>;
 }
 
 #[ink::trait_definition]
-pub trait PSP22Metadata {
-    /// Returns the token name.
+pub trait PSP34Metadata {
+    /// Returns the attribute of `id` for the given `key`.
+    /// 
+    /// If `id` is a collection id of the token, it returns attributes for collection.
     #[ink(message)]
-    fn token_name(&self) -> Option<String>;
-    /// Returns the token symbol.
-    #[ink(message)]
-    fn token_symbol(&self) -> Option<String>;
-    /// Returns the token decimals.
-    #[ink(message)]
-    fn token_decimals(&self) -> u8;
+    fn get_attribute(&self, id: Id, key: String) -> Option<String>;
 }

@@ -1,43 +1,55 @@
-use crate::PSP22Error;
+use crate::PSP34Error;
 use ink::{
-    prelude::{vec, vec::Vec},
+    prelude::{vec, vec::Vec, string::String},
     primitives::AccountId,
-    storage::Mapping,
+    storage::Mapping,    
 };
 
-#[cfg(any(feature = "mintable", feature = "burnable"))]
-use ink::prelude::string::String;
+#[cfg(feature = "std")]
+use ink::storage::traits::StorageLayout;
 
-pub enum PSP22Event {
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, scale::Encode, scale::Decode)]
+#[cfg_attr(feature = "std", derive(scale_info::TypeInfo, StorageLayout))]
+pub enum Id {
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    U64(u64),
+    U128(u128),
+    Bytes(Vec<u8>),
+}
+
+pub enum PSP34Event {
     Transfer {
         from: Option<AccountId>,
         to: Option<AccountId>,
-        value: u128,
+        id: Id,
     },
     Approval {
         owner: AccountId,
-        spender: AccountId,
-        amount: u128,
+        operator: AccountId,
+        id: Option<Id>,
+        approved: bool,
     },
+    AttributeSet {
+        id: Id,
+        key: String,
+        data: String,
+    }
 }
 
 #[ink::storage_item]
 #[derive(Debug, Default)]
-pub struct PSP22Data {
+pub struct PSP34Data {
+    token_owner: Mapping<Id, AccountId>,
+    owned_tokens_count: Mapping<AccountId, u128>,
+    operator_approvals: Mapping<(AccountId, AccountId, Option<Id>), ()>,
     total_supply: u128,
-    balances: Mapping<AccountId, u128>,
-    allowances: Mapping<(AccountId, AccountId), u128>,
 }
 
-impl PSP22Data {
-    pub fn new(supply: u128, creator: AccountId) -> PSP22Data {
-        let mut data = PSP22Data {
-            total_supply: supply,
-            balances: Default::default(),
-            allowances: Default::default(),
-        };
-        data.balances.insert(creator, &supply);
-        data
+impl PSP34Data {
+    pub fn new() -> PSP34Data {
+        Default::default()
     }
 
     pub fn total_supply(&self) -> u128 {
@@ -45,205 +57,152 @@ impl PSP22Data {
     }
 
     pub fn balance_of(&self, owner: AccountId) -> u128 {
-        self.balances.get(owner).unwrap_or_default()
+        self.owned_tokens_count.get(owner).unwrap_or_default()
     }
 
-    pub fn allowance(&self, owner: AccountId, spender: AccountId) -> u128 {
-        self.allowances.get((owner, spender)).unwrap_or_default()
+    pub fn owner_of(&self, id: &Id) -> Option<AccountId> {
+        self.token_owner.get(id)
     }
 
-    pub fn transfer(
-        &mut self,
-        caller: AccountId,
-        to: AccountId,
-        value: u128,
-    ) -> Result<Vec<PSP22Event>, PSP22Error> {
-        if caller == to || value == 0 {
-            return Ok(vec![]);
-        }
-        let from_balance = self.balance_of(caller);
-        if from_balance < value {
-            return Err(PSP22Error::InsufficientBalance);
-        }
-
-        if from_balance == value {
-            self.balances.remove(caller);
-        } else {
-            self.balances
-                .insert(caller, &(from_balance.saturating_sub(value)));
-        }
-        let to_balance = self.balance_of(to);
-        // Total supply is limited by u128.MAX so no overflow is possible
-        self.balances
-            .insert(to, &(to_balance.saturating_add(value)));
-        Ok(vec![PSP22Event::Transfer {
-            from: Some(caller),
-            to: Some(to),
-            value,
-        }])
+    pub fn allowance(&self, owner: AccountId, operator: AccountId, id: Option<&Id>) -> bool {
+        self.operator_approvals.get((owner, operator, &None)).is_some()
+            || id.is_some() && self.operator_approvals.get((owner, operator, id)).is_some()
     }
 
-    pub fn transfer_from(
-        &mut self,
-        caller: AccountId,
-        from: AccountId,
-        to: AccountId,
-        value: u128,
-    ) -> Result<Vec<PSP22Event>, PSP22Error> {
-        if from == to || value == 0 {
-            return Ok(vec![]);
-        }
-        if caller == from {
-            return self.transfer(caller, to, value);
-        }
-
-        let allowance = self.allowance(from, caller);
-        if allowance < value {
-            return Err(PSP22Error::InsufficientAllowance);
-        }
-        let from_balance = self.balance_of(from);
-        if from_balance < value {
-            return Err(PSP22Error::InsufficientBalance);
-        }
-
-        if allowance == value {
-            self.allowances.remove((from, caller));
-        } else {
-            self.allowances
-                .insert((from, caller), &(allowance.saturating_sub(value)));
-        }
-
-        if from_balance == value {
-            self.balances.remove(from);
-        } else {
-            self.balances
-                .insert(from, &(from_balance.saturating_sub(value)));
-        }
-        let to_balance = self.balance_of(to);
-        // Total supply is limited by u128.MAX so no overflow is possible
-        self.balances
-            .insert(to, &(to_balance.saturating_add(value)));
-        Ok(vec![
-            PSP22Event::Approval {
-                owner: from,
-                spender: caller,
-                amount: allowance.saturating_sub(value),
-            },
-            PSP22Event::Transfer {
-                from: Some(from),
-                to: Some(to),
-                value,
-            },
-        ])
+    pub fn collection_id(&self, account_id: AccountId) -> Id {
+        Id::Bytes(<_ as AsRef<[u8; 32]>>::as_ref(&account_id).to_vec())
     }
 
     pub fn approve(
-        &mut self,
-        owner: AccountId,
-        spender: AccountId,
-        value: u128,
-    ) -> Result<Vec<PSP22Event>, PSP22Error> {
-        if owner == spender {
-            return Ok(vec![]);
+        &mut self, 
+        mut caller: AccountId, 
+        operator: AccountId, 
+        id: Option<Id>, 
+        approved: bool
+    ) -> Result<Vec<PSP34Event>, PSP34Error> {
+
+        if let Some(id) = &id {
+            let owner = self.owner_of(id).ok_or(PSP34Error::TokenNotExists)?;
+            if approved && owner == operator {
+                return Err(PSP34Error::SelfApprove)
+            }
+
+            if owner != caller && !self.allowance(owner, caller, None) {
+                return Err(PSP34Error::NotApproved)
+            }
+
+            if !approved && self.allowance(owner, operator, None) {
+                return Err(PSP34Error::Custom(String::from(
+                    "Cannot revoke approval for a single token, when the operator has approval for all tokens."
+                )))
+            }
+            caller = owner;
         }
-        if value == 0 {
-            self.allowances.remove((owner, spender));
+
+        if approved {
+            self.operator_approvals
+                .insert((caller, operator, id.as_ref()), &());
         } else {
-            self.allowances.insert((owner, spender), &value);
+            self.operator_approvals
+                .remove((caller, operator, id.as_ref()));
         }
-        Ok(vec![PSP22Event::Approval {
-            owner,
-            spender,
-            amount: value,
+
+        Ok(vec![PSP34Event::Approval {
+            owner: caller,
+            operator,
+            id,
+            approved,
         }])
     }
 
-    pub fn increase_allowance(
-        &mut self,
-        owner: AccountId,
-        spender: AccountId,
-        delta_value: u128,
-    ) -> Result<Vec<PSP22Event>, PSP22Error> {
-        if owner == spender || delta_value == 0 {
-            return Ok(vec![]);
-        }
-        let allowance = self.allowance(owner, spender);
-        let amount = allowance.saturating_add(delta_value);
-        self.allowances.insert((owner, spender), &amount);
-        Ok(vec![PSP22Event::Approval {
-            owner,
-            spender,
-            amount,
-        }])
-    }
+    pub fn transfer(
+        &mut self, 
+        caller: AccountId, 
+        to: AccountId, 
+        id: Id, 
+        _data: Vec<u8>
+    ) -> Result<Vec<PSP34Event>, PSP34Error> {
+        let owner = self.owner_of(&id).ok_or(PSP34Error::TokenNotExists)?;
 
-    pub fn decrease_allowance(
-        &mut self,
-        owner: AccountId,
-        spender: AccountId,
-        delta_value: u128,
-    ) -> Result<Vec<PSP22Event>, PSP22Error> {
-        if owner == spender || delta_value == 0 {
-            return Ok(vec![]);
+        if owner == to {
+            return Ok(vec![])
         }
-        let allowance = self.allowance(owner, spender);
-        if allowance < delta_value {
-            return Err(PSP22Error::InsufficientAllowance);
+
+        if owner != caller && !self.allowance(owner, caller, Some(&id)) {
+            return Err(PSP34Error::NotApproved)
         }
-        let amount = allowance.saturating_sub(delta_value);
-        if amount == 0 {
-            self.allowances.remove((owner, spender));
+
+        let from_balance = self.balance_of(owner);
+        if from_balance == 1 {
+            self.owned_tokens_count.remove(owner);
         } else {
-            self.allowances.insert((owner, spender), &amount);
+            self.owned_tokens_count
+                .insert(owner, &(from_balance.checked_sub(1).unwrap()));
         }
-        Ok(vec![PSP22Event::Approval {
-            owner,
-            spender,
-            amount,
+        self.operator_approvals.remove((owner, caller, Some(&id)));
+        self.token_owner.remove(&id);
+
+        self.token_owner.insert(&id, &to);
+        let to_balance = self.balance_of(to);
+        self.owned_tokens_count
+            .insert(to, &(to_balance.checked_add(1).unwrap()));
+
+        Ok(vec![PSP34Event::Transfer { 
+            from: Some(caller),
+            to: Some(to),
+            id,
         }])
     }
-
-    #[cfg(feature = "mintable")]
-    pub fn mint(&mut self, account: AccountId, value: u128) -> Result<Vec<PSP22Event>, PSP22Error> {
-        if value == 0 {
-            return Ok(vec![]);
+    
+    pub fn mint(&mut self, account: AccountId, id: Id) -> Result<Vec<PSP34Event>, PSP34Error> {
+        if self.owner_of(&id).is_some() {
+            return Err(PSP34Error::TokenExists)
         }
         let new_supply = self
             .total_supply
-            .checked_add(value)
-            .ok_or(PSP22Error::Custom(String::from(
-                "Max PSP22 supply exceeded. Max supply limited to 2^128-1.",
+            .checked_add(1)
+            .ok_or(PSP34Error::Custom(String::from(
+                "Max PSP34 supply exceeded. Max supply limited to 2^128-1.",
             )))?;
         self.total_supply = new_supply;
-        let new_balance = self.balance_of(account).saturating_add(value);
-        self.balances.insert(account, &new_balance);
-        Ok(vec![PSP22Event::Transfer {
+        let new_balance = self.balance_of(account).saturating_add(1);
+        self.owned_tokens_count.insert(account, &new_balance);
+        self.token_owner.insert(&id, &account);
+
+        Ok(vec![PSP34Event::Transfer {
             from: None,
             to: Some(account),
-            value,
+            id,
         }])
     }
 
-    #[cfg(feature = "burnable")]
-    pub fn burn(&mut self, account: AccountId, value: u128) -> Result<Vec<PSP22Event>, PSP22Error> {
-        if value == 0 {
-            return Ok(vec![]);
+    pub fn burn(&mut self, caller: AccountId, account: AccountId, id: Id) -> Result<Vec<PSP34Event>, PSP34Error> {
+        if !self.owner_of(&id).is_some() {
+            return Err(PSP34Error::TokenNotExists)
         }
-        let balance = self.balance_of(account);
-        if balance < value {
-            return Err(PSP22Error::InsufficientBalance);
+        if account != caller && !self.allowance(caller, account, None) {
+            return Err(PSP34Error::NotApproved)
         }
-        if balance == value {
-            self.balances.remove(account);
+        self.token_owner.remove(&id);        
+        let new_balance = self.balance_of(account).saturating_sub(1);
+        if new_balance == 0 {
+            self.owned_tokens_count.remove(account);
         } else {
-            self.balances
-                .insert(account, &(balance.saturating_sub(value)));
+            self.owned_tokens_count
+                .insert(account, &new_balance);
         }
-        self.total_supply = self.total_supply.saturating_sub(value);
-        Ok(vec![PSP22Event::Transfer {
+        self.total_supply = self.total_supply.saturating_sub(1);
+
+        Ok(vec![PSP34Event::Transfer {
             from: Some(account),
             to: None,
-            value,
+            id,
         }])
+    }
+}
+
+impl Default for Id {
+    fn default() -> Self {
+        Self::U8(0)
     }
 }

@@ -2,17 +2,17 @@ use ink::prelude::string::String;
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
-pub enum PSP22Error {
-    /// Custom error type for cases in which an implementation adds its own restrictions.
+pub enum PSP34Error {
+    /// Custom error type for cases if writer of traits added own restrictions
     Custom(String),
-    /// Returned if not enough Balance to fulfill a request is available.
-    InsufficientBalance,
-    /// Returned if not enough allowance to fulfill a request is available.
-    InsufficientAllowance,
-    /// Returned if recipient's address is zero.
-    ZeroRecipientAddress,
-    /// Returned if sender's address is zero.
-    ZeroSenderAddress,
-    /// Returned if a safe transfer check fails (e.g. if the receiving contract does not accept tokens).
+    /// Returned if owner approves self
+    SelfApprove,
+    /// Returned if the caller doesn't have allowance for transferring.
+    NotApproved,
+    /// Returned if the owner already own the token.
+    TokenExists,
+    /// Returned if the token doesn't exist
+    TokenNotExists,
+    /// Returned if safe transfer check fails
     SafeTransferCheckFailed(String),
 }
