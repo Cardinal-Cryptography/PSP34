@@ -6,11 +6,11 @@ mod traits;
 
 pub use data::{Id, PSP34Data, PSP34Event};
 pub use errors::PSP34Error;
-pub use traits::{PSP34Metadata, PSP34};
+pub use traits::{PSP34Burnable, PSP34Metadata, PSP34Mintable, PSP34};
 
 #[ink::contract]
 mod token {
-    use crate::{Id, PSP34Data, PSP34Error, PSP34Event, PSP34};
+    use crate::{Id, PSP34Burnable, PSP34Data, PSP34Error, PSP34Event, PSP34Mintable, PSP34};
 
     #[ink(storage)]
     pub struct Token {
@@ -127,13 +127,17 @@ mod token {
         fn owner_of(&self, id: Id) -> Option<AccountId> {
             self.data.owner_of(&id)
         }
+    }
 
+    impl PSP34Mintable for Token {
         #[ink(message)]
         fn mint(&mut self, id: Id) -> Result<(), PSP34Error> {
             let events = self.data.mint(self.env().caller(), id)?;
             Ok(self.emit_events(events))
         }
+    }
 
+    impl PSP34Burnable for Token {
         #[ink(message)]
         fn burn(&mut self, account: AccountId, id: Id) -> Result<(), PSP34Error> {
             let events = self.data.burn(self.env().caller(), account, id)?;
