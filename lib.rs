@@ -107,7 +107,8 @@ mod token {
             data: ink::prelude::vec::Vec<u8>,
         ) -> Result<(), PSP34Error> {
             let events = self.data.transfer(self.env().caller(), to, id, data)?;
-            Ok(self.emit_events(events))
+            self.emit_events(events);
+            Ok(())
         }
 
         #[ink(message)]
@@ -120,7 +121,8 @@ mod token {
             let events = self
                 .data
                 .approve(self.env().caller(), operator, id, approved)?;
-            Ok(self.emit_events(events))
+            self.emit_events(events);
+            Ok(())
         }
 
         #[ink(message)]
@@ -132,16 +134,22 @@ mod token {
     impl PSP34Mintable for Token {
         #[ink(message)]
         fn mint(&mut self, id: Id) -> Result<(), PSP34Error> {
+            // Add security, restrict usage of the message
+            todo!();
             let events = self.data.mint(self.env().caller(), id)?;
-            Ok(self.emit_events(events))
+            self.emit_events(events);
+            Ok(())
         }
     }
 
     impl PSP34Burnable for Token {
         #[ink(message)]
         fn burn(&mut self, account: AccountId, id: Id) -> Result<(), PSP34Error> {
+            // Add security, restrict usage of the message
+            todo!();
             let events = self.data.burn(self.env().caller(), account, id)?;
-            Ok(self.emit_events(events))
+            self.emit_events(events);
+            Ok(())
         }
     }
 
