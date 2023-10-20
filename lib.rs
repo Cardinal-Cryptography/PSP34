@@ -4,13 +4,13 @@ mod data;
 mod errors;
 mod traits;
 
-pub use data::{PSP34Data, PSP34Event, Id};
+pub use data::{Id, PSP34Data, PSP34Event};
 pub use errors::PSP34Error;
 pub use traits::{PSP34Metadata, PSP34};
 
 #[ink::contract]
 mod token {
-    use crate::{PSP34Data, PSP34Error, PSP34Event, PSP34, Id};
+    use crate::{Id, PSP34Data, PSP34Error, PSP34Event, PSP34};
 
     #[ink(storage)]
     pub struct Token {
@@ -28,22 +28,23 @@ mod token {
         fn emit_events(&self, events: ink::prelude::vec::Vec<PSP34Event>) {
             for event in events {
                 match event {
-                    PSP34Event::Transfer { 
-                        from, 
-                        to, 
-                        id, 
-                    } => self.env().emit_event(Transfer { from, to, id }),
                     PSP34Event::Approval {
                         owner,
                         operator,
                         id,
                         approved,
-                    } => self.env().emit_event(Approval { owner, operator, id, approved }),
-                    PSP34Event::AttributeSet { 
-                        id, 
-                        key, 
-                        data 
-                    } => self.env().emit_event(AttributeSet {id, key, data }),                
+                    } => self.env().emit_event(Approval {
+                        owner,
+                        operator,
+                        id,
+                        approved,
+                    }),
+                    PSP34Event::Transfer { from, to, id } => {
+                        self.env().emit_event(Transfer { from, to, id })
+                    }
+                    PSP34Event::AttributeSet { id, key, data } => {
+                        self.env().emit_event(AttributeSet { id, key, data })
+                    }
                 }
             }
         }
@@ -82,7 +83,7 @@ mod token {
         fn collection_id(&self) -> Id {
             self.data.collection_id(self.env().caller())
         }
-        
+
         #[ink(message)]
         fn total_supply(&self) -> u128 {
             self.data.total_supply()
@@ -99,14 +100,26 @@ mod token {
         }
 
         #[ink(message)]
-        fn transfer(&mut self, to: AccountId, id: Id, data: ink::prelude::vec::Vec<u8>) -> Result<(), PSP34Error> {
+        fn transfer(
+            &mut self,
+            to: AccountId,
+            id: Id,
+            data: ink::prelude::vec::Vec<u8>,
+        ) -> Result<(), PSP34Error> {
             let events = self.data.transfer(self.env().caller(), to, id, data)?;
             Ok(self.emit_events(events))
         }
 
         #[ink(message)]
-        fn approve(&mut self, operator: AccountId, id: Option<Id>, approved: bool) -> Result<(), PSP34Error> {
-            let events = self.data.approve(self.env().caller(), operator, id, approved)?;
+        fn approve(
+            &mut self,
+            operator: AccountId,
+            id: Option<Id>,
+            approved: bool,
+        ) -> Result<(), PSP34Error> {
+            let events = self
+                .data
+                .approve(self.env().caller(), operator, id, approved)?;
             Ok(self.emit_events(events))
         }
 
@@ -128,7 +141,6 @@ mod token {
         }
     }
 
-
     #[cfg(test)]
     mod tests {
         /// Imports all the definitions from the outer scope so we can use them here.
@@ -136,8 +148,7 @@ mod token {
 
         #[ink::test]
         fn mint_works() {
-            let accounts =
-                ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+            let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             // Create a new contract instance.
             let mut token = Token::new();
             // Token 1 does not exists.
@@ -152,8 +163,7 @@ mod token {
 
         #[ink::test]
         fn mint_existing_should_fail() {
-            let accounts =
-                ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+            let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             // Create a new contract instance.
             let mut token = Token::new();
             // Create token Id 1.
@@ -171,8 +181,7 @@ mod token {
 
         #[ink::test]
         fn transfer_works() {
-            let accounts =
-                ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+            let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             // Create a new contract instance.
             let mut token = Token::new();
             // Create token Id 1 for Alice
@@ -184,7 +193,10 @@ mod token {
             // The first Transfer event takes place
             assert_eq!(1, ink::env::test::recorded_events().count());
             // Alice transfers token 1 to Bob
-            assert_eq!(token.transfer(accounts.bob, Id::U8(1), ink::prelude::vec![u8::default()]), Ok(()));
+            assert_eq!(
+                token.transfer(accounts.bob, Id::U8(1), ink::prelude::vec![u8::default()]),
+                Ok(())
+            );
             // The second Transfer event takes place
             assert_eq!(2, ink::env::test::recorded_events().count());
             // Bob owns token 1
@@ -193,12 +205,14 @@ mod token {
 
         #[ink::test]
         fn invalid_transfer_should_fail() {
-            let accounts =
-                ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+            let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             // Create a new contract instance.
             let mut token = Token::new();
             // Transfer token fails if it does not exists.
-            assert_eq!(token.transfer(accounts.bob, Id::U8(2), ink::prelude::vec![u8::default()]), Err(PSP34Error::TokenNotExists));
+            assert_eq!(
+                token.transfer(accounts.bob, Id::U8(2), ink::prelude::vec![u8::default()]),
+                Err(PSP34Error::TokenNotExists)
+            );
             // Token Id 2 does not exists.
             assert_eq!(token.owner_of(Id::U8(2)), None);
             // Create token Id 2.
@@ -210,13 +224,15 @@ mod token {
             // Set Bob as caller
             set_caller(accounts.bob);
             // Bob cannot transfer not owned tokens.
-            assert_eq!(token.transfer(accounts.eve, Id::U8(2), ink::prelude::vec![u8::default()]), Err(PSP34Error::NotApproved));
+            assert_eq!(
+                token.transfer(accounts.eve, Id::U8(2), ink::prelude::vec![u8::default()]),
+                Err(PSP34Error::NotApproved)
+            );
         }
 
         #[ink::test]
         fn approved_transfer_works() {
-            let accounts =
-                ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+            let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             // Create a new contract instance.
             let mut token = Token::new();
             // Create token Id 1.
@@ -244,8 +260,7 @@ mod token {
 
         #[ink::test]
         fn approved_for_all_works() {
-            let accounts =
-                ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+            let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             // Create a new contract instance.
             let mut token = Token::new();
             // Create token Id 1.
@@ -287,8 +302,7 @@ mod token {
 
         #[ink::test]
         fn approved_for_all_revoke_single_approval_should_fail() {
-            let accounts =
-                ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+            let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             // Create a new contract instance.
             let mut token = Token::new();
             // Create token Id 1.
@@ -302,7 +316,7 @@ mod token {
             // Bob is an approved operator for Alice
             assert!(token.allowance(accounts.alice, accounts.bob, None));
             // Cannot revoke approval for a single token for Bob
-            assert_eq!(token.approve(accounts.bob, Some(Id::U8(1)), false), 
+            assert_eq!(token.approve(accounts.bob, Some(Id::U8(1)), false),
                 Err(PSP34Error::Custom(String::from(
                     "Cannot revoke approval for a single token, when the operator has approval for all tokens.")))
             );
@@ -310,8 +324,7 @@ mod token {
 
         #[ink::test]
         fn not_approved_transfer_should_fail() {
-            let accounts =
-                ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+            let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             // Create a new contract instance.
             let mut token = Token::new();
             // Create token Id 1.
@@ -339,8 +352,7 @@ mod token {
 
         #[ink::test]
         fn burn_works() {
-            let accounts =
-                ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+            let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             // Create a new contract instance.
             let mut token = Token::new();
             // Create token Id 1 for Alice
@@ -359,25 +371,29 @@ mod token {
 
         #[ink::test]
         fn burn_fails_token_not_found() {
-            let accounts =
-            ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+            let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             // Create a new contract instance.
             let mut token = Token::new();
             // Try burning a non existent token
-            assert_eq!(token.burn(accounts.alice, Id::U8(1)), Err(PSP34Error::TokenNotExists));
+            assert_eq!(
+                token.burn(accounts.alice, Id::U8(1)),
+                Err(PSP34Error::TokenNotExists)
+            );
         }
 
         #[ink::test]
         fn burn_fails_not_owner() {
-            let accounts =
-                ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+            let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             // Create a new contract instance.
             let mut token = Token::new();
             // Create token Id 1 for Alice
             assert_eq!(token.mint(Id::U8(1)), Ok(()));
             // Try burning this token with a different account
             set_caller(accounts.eve);
-            assert_eq!(token.burn(accounts.alice, Id::U8(1)), Err(PSP34Error::NotApproved));
+            assert_eq!(
+                token.burn(accounts.alice, Id::U8(1)),
+                Err(PSP34Error::NotApproved)
+            );
         }
 
         fn set_caller(sender: AccountId) {
@@ -385,5 +401,3 @@ mod token {
         }
     }
 }
-
-

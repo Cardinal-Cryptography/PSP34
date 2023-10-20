@@ -13,7 +13,7 @@ pub trait PSP34 {
     /// This can represents the relationship between tokens/contracts/pallets.
     #[ink(message)]
     fn collection_id(&self) -> Id;
-    
+
     /// Returns the current total supply of the NFT.
     #[ink(message)]
     fn total_supply(&self) -> u128;
@@ -25,7 +25,7 @@ pub trait PSP34 {
     fn balance_of(&self, owner: AccountId) -> u128;
 
     /// Returns `true` if the operator is approved by the owner to withdraw `id` token.
-    /// 
+    ///
     /// If `id` is `None`, returns `true` if the operator is approved to withdraw all owner's tokens.
     #[ink(message)]
     fn allowance(&self, owner: AccountId, operator: AccountId, id: Option<Id>) -> bool;
@@ -44,7 +44,6 @@ pub trait PSP34 {
     #[ink(message)]
     fn transfer(&mut self, to: AccountId, id: Id, data: Vec<u8>) -> Result<(), PSP34Error>;
 
-    
     /// Approves `operator` to withdraw  the `id` token from the caller's account.
     /// If `id` is `None` approves or disapproves the operator for all tokens of the caller.
     ///
@@ -56,13 +55,16 @@ pub trait PSP34 {
     ///
     /// Returns `NotApproved` error if caller is not owner of `id`.
     #[ink(message)]
-    fn approve(&mut self, operator: AccountId, id: Option<Id>, approved: bool) -> Result<(), PSP34Error>;
+    fn approve(
+        &mut self,
+        operator: AccountId,
+        id: Option<Id>,
+        approved: bool,
+    ) -> Result<(), PSP34Error>;
 
     /// Returns the owner of the token if any.
     #[ink(message)]
     fn owner_of(&self, id: Id) -> Option<AccountId>;
-
-
 
     #[ink(message)]
     fn mint(&mut self, id: Id) -> Result<(), PSP34Error>;
@@ -74,7 +76,7 @@ pub trait PSP34 {
 #[ink::trait_definition]
 pub trait PSP34Metadata {
     /// Returns the attribute of `id` for the given `key`.
-    /// 
+    ///
     /// If `id` is a collection id of the token, it returns attributes for collection.
     #[ink(message)]
     fn get_attribute(&self, id: Id, key: String) -> Option<String>;

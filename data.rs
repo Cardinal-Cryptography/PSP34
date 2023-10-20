@@ -1,8 +1,8 @@
 use crate::PSP34Error;
 use ink::{
-    prelude::{vec, vec::Vec, string::String},
+    prelude::{string::String, vec, vec::Vec},
     primitives::AccountId,
-    storage::Mapping,    
+    storage::Mapping,
 };
 
 #[cfg(feature = "std")]
@@ -35,7 +35,7 @@ pub enum PSP34Event {
         id: Id,
         key: String,
         data: String,
-    }
+    },
 }
 
 #[ink::storage_item]
@@ -65,7 +65,9 @@ impl PSP34Data {
     }
 
     pub fn allowance(&self, owner: AccountId, operator: AccountId, id: Option<&Id>) -> bool {
-        self.operator_approvals.get((owner, operator, &None)).is_some()
+        self.operator_approvals
+            .get((owner, operator, &None))
+            .is_some()
             || id.is_some() && self.operator_approvals.get((owner, operator, id)).is_some()
     }
 
@@ -74,27 +76,26 @@ impl PSP34Data {
     }
 
     pub fn approve(
-        &mut self, 
-        mut caller: AccountId, 
-        operator: AccountId, 
-        id: Option<Id>, 
-        approved: bool
+        &mut self,
+        mut caller: AccountId,
+        operator: AccountId,
+        id: Option<Id>,
+        approved: bool,
     ) -> Result<Vec<PSP34Event>, PSP34Error> {
-
         if let Some(id) = &id {
             let owner = self.owner_of(id).ok_or(PSP34Error::TokenNotExists)?;
             if approved && owner == operator {
-                return Err(PSP34Error::SelfApprove)
+                return Err(PSP34Error::SelfApprove);
             }
 
             if owner != caller && !self.allowance(owner, caller, None) {
-                return Err(PSP34Error::NotApproved)
+                return Err(PSP34Error::NotApproved);
             }
 
             if !approved && self.allowance(owner, operator, None) {
                 return Err(PSP34Error::Custom(String::from(
                     "Cannot revoke approval for a single token, when the operator has approval for all tokens."
-                )))
+                )));
             }
             caller = owner;
         }
@@ -116,20 +117,20 @@ impl PSP34Data {
     }
 
     pub fn transfer(
-        &mut self, 
-        caller: AccountId, 
-        to: AccountId, 
-        id: Id, 
-        _data: Vec<u8>
+        &mut self,
+        caller: AccountId,
+        to: AccountId,
+        id: Id,
+        _data: Vec<u8>,
     ) -> Result<Vec<PSP34Event>, PSP34Error> {
         let owner = self.owner_of(&id).ok_or(PSP34Error::TokenNotExists)?;
 
         if owner == to {
-            return Ok(vec![])
+            return Ok(vec![]);
         }
 
         if owner != caller && !self.allowance(owner, caller, Some(&id)) {
-            return Err(PSP34Error::NotApproved)
+            return Err(PSP34Error::NotApproved);
         }
 
         let from_balance = self.balance_of(owner);
@@ -147,23 +148,23 @@ impl PSP34Data {
         self.owned_tokens_count
             .insert(to, &(to_balance.checked_add(1).unwrap()));
 
-        Ok(vec![PSP34Event::Transfer { 
+        Ok(vec![PSP34Event::Transfer {
             from: Some(caller),
             to: Some(to),
             id,
         }])
     }
-    
+
     pub fn mint(&mut self, account: AccountId, id: Id) -> Result<Vec<PSP34Event>, PSP34Error> {
         if self.owner_of(&id).is_some() {
-            return Err(PSP34Error::TokenExists)
+            return Err(PSP34Error::TokenExists);
         }
-        let new_supply = self
-            .total_supply
-            .checked_add(1)
-            .ok_or(PSP34Error::Custom(String::from(
-                "Max PSP34 supply exceeded. Max supply limited to 2^128-1.",
-            )))?;
+        let new_supply =
+            self.total_supply
+                .checked_add(1)
+                .ok_or(PSP34Error::Custom(String::from(
+                    "Max PSP34 supply exceeded. Max supply limited to 2^128-1.",
+                )))?;
         self.total_supply = new_supply;
         let new_balance = self.balance_of(account).saturating_add(1);
         self.owned_tokens_count.insert(account, &new_balance);
@@ -176,20 +177,24 @@ impl PSP34Data {
         }])
     }
 
-    pub fn burn(&mut self, caller: AccountId, account: AccountId, id: Id) -> Result<Vec<PSP34Event>, PSP34Error> {
-        if !self.owner_of(&id).is_some() {
-            return Err(PSP34Error::TokenNotExists)
+    pub fn burn(
+        &mut self,
+        caller: AccountId,
+        account: AccountId,
+        id: Id,
+    ) -> Result<Vec<PSP34Event>, PSP34Error> {
+        if self.owner_of(&id).is_none() {
+            return Err(PSP34Error::TokenNotExists);
         }
         if account != caller && !self.allowance(caller, account, None) {
-            return Err(PSP34Error::NotApproved)
+            return Err(PSP34Error::NotApproved);
         }
-        self.token_owner.remove(&id);        
+        self.token_owner.remove(&id);
         let new_balance = self.balance_of(account).saturating_sub(1);
         if new_balance == 0 {
             self.owned_tokens_count.remove(account);
         } else {
-            self.owned_tokens_count
-                .insert(account, &new_balance);
+            self.owned_tokens_count.insert(account, &new_balance);
         }
         self.total_supply = self.total_supply.saturating_sub(1);
 
