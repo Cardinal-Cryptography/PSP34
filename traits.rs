@@ -65,12 +65,6 @@ pub trait PSP34 {
     /// Returns the owner of the token if any.
     #[ink(message)]
     fn owner_of(&self, id: Id) -> Option<AccountId>;
-
-    #[ink(message)]
-    fn mint(&mut self, id: Id) -> Result<(), PSP34Error>;
-
-    #[ink(message)]
-    fn burn(&mut self, account: AccountId, id: Id) -> Result<(), PSP34Error>;
 }
 
 #[ink::trait_definition]
@@ -80,4 +74,37 @@ pub trait PSP34Metadata {
     /// If `id` is a collection id of the token, it returns attributes for collection.
     #[ink(message)]
     fn get_attribute(&self, id: Id, key: String) -> Option<String>;
+}
+
+#[ink::trait_definition]
+pub trait PSP34Mintable {
+    /// Mints a token to the sender's account.
+    ///
+    /// # Events
+    ///
+    /// On success a `Transfer` event is emitted with `None` sender.
+    ///
+    /// # Errors
+    ///
+    /// Reverts with `TokenExists`` if token id is already in the library.
+    /// 
+    /// Reverts with `Custom (max supply exceeded)` if the incremented by 1 total
+    /// supply exceeds maximal value of `u128` type.
+    #[ink(message)]
+    fn mint(&mut self, id: Id) -> Result<(), PSP34Error>;
+}
+
+#[ink::trait_definition]
+pub trait PSP34Burnable {
+    /// Burns token from the selected account.
+    ///
+    /// # Events
+    ///
+    /// On success a `Transfer` event is emitted with `None` recipient.
+    ///
+    /// # Errors
+    ///
+    /// Reverts with `TokenExists` if token id is already in the library.
+    #[ink(message)]
+    fn burn(&mut self, account: AccountId, id: Id) -> Result<(), PSP34Error>;
 }
