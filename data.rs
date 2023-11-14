@@ -8,6 +8,8 @@ use ink::{
 #[cfg(feature = "std")]
 use ink::storage::traits::StorageLayout;
 
+/// Type for a PSP34 token id.
+/// Contains all the possible permutations of id according to the standard.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, scale::Encode, scale::Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, StorageLayout))]
 pub enum Id {
@@ -19,6 +21,10 @@ pub enum Id {
     Bytes(Vec<u8>),
 }
 
+/// Temporary type for events emitted during operations that change the
+/// state of PSP34Data struct.
+/// This is meant to be replaced with proper ink! events as soon as the
+/// language allows for event definitions outside contracts.
 pub enum PSP34Event {
     Transfer {
         from: Option<AccountId>,
@@ -38,6 +44,18 @@ pub enum PSP34Event {
     },
 }
 
+/// A class implementing the internal logic of a PSP34 token.
+//
+/// Holds the state of all account balances and approvals.
+/// Each method of this class corresponds to one type of transaction
+/// as defined in the PSP34 standard.
+//
+/// Since this code is outside of `ink::contract` macro, the caller's
+/// address cannot be obtained automatically. Because of that, all
+/// the methods that need to know the caller require an additional argument
+/// (compared to transactions defined by the PSP34 standard or the PSP34 trait).
+//
+/// `lib.rs` contains an example implementation of a smart contract using this class.
 #[ink::storage_item]
 #[derive(Debug, Default)]
 pub struct PSP34Data {
@@ -48,6 +66,8 @@ pub struct PSP34Data {
 }
 
 impl PSP34Data {
+    /// Creates a token with default values for every field.
+    /// Initially held by the 'creator' account.
     pub fn new() -> PSP34Data {
         Default::default()
     }
@@ -75,6 +95,9 @@ impl PSP34Data {
         Id::Bytes(<_ as AsRef<[u8; 32]>>::as_ref(&account_id).to_vec())
     }
 
+    /// Sets a new `approved` for a token `id` or for all tokens if no `id` is provided,
+    /// granted by `caller` to `operator`.
+    /// Overwrites the previously granted value.
     pub fn approve(
         &mut self,
         mut caller: AccountId,
@@ -116,6 +139,7 @@ impl PSP34Data {
         }])
     }
 
+    /// Transfers `value` tokens from `caller` to `to`.
     pub fn transfer(
         &mut self,
         caller: AccountId,
@@ -155,6 +179,7 @@ impl PSP34Data {
         }])
     }
 
+    /// Mints a token `id` to `account`.
     pub fn mint(&mut self, account: AccountId, id: Id) -> Result<Vec<PSP34Event>, PSP34Error> {
         if self.owner_of(&id).is_some() {
             return Err(PSP34Error::TokenExists);
@@ -177,6 +202,7 @@ impl PSP34Data {
         }])
     }
 
+    /// Burns token `id` from `account`, conducted by `caller`
     pub fn burn(
         &mut self,
         caller: AccountId,
