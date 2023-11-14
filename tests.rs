@@ -9,7 +9,7 @@ macro_rules! tests {
             use super::super::*;
             use ink::env::{test::*, DefaultEnvironment as E};
 
-            type Event = <$contract as ::ink::reflect::ContractEventBase>::Type;   
+            type Event = <$contract as ::ink::reflect::ContractEventBase>::Type;
 
             // Gathers all emitted events, skip `shift` first, decode the rest and return as vector
             fn decode_events(shift: usize) -> Vec<Event> {
@@ -35,7 +35,7 @@ macro_rules! tests {
                 event: &Event,
                 owner_: AccountId,
                 operator_: AccountId,
-                id_: Id,
+                id_: Option<Id>,
             ) {
                 if let Event::Approval(Approval {
                     owner,
@@ -50,7 +50,6 @@ macro_rules! tests {
                     panic!("Event is not Approval")
                 }
             }
-            
 
             #[ink::test]
             fn mint_works() {
@@ -110,6 +109,32 @@ macro_rules! tests {
             }
 
             #[ink::test]
+            fn transfer_emits_event() {                
+                let accounts = default_accounts::<E>();
+                let start = recorded_events().count();
+                // Create a new contract instance.
+                let mut token = $constructor();
+                // Create token Id 1 for Alice
+                assert_eq!(token.mint(Id::U8(1)), Ok(()));
+                // Alice owns token 1
+                assert_eq!(token.balance_of(accounts.alice), 1);
+                // Bob does not owns any token
+                assert_eq!(token.balance_of(accounts.bob), 0);
+                // The first Transfer event takes place
+                assert_eq!(1, recorded_events().count());
+                // Alice transfers token 1 to Bob
+                assert_eq!(
+                    token.transfer(accounts.bob, Id::U8(1), ink::prelude::vec![u8::default()]),
+                    Ok(())
+                );                
+                // The second Transfer event takes place
+                assert_eq!(2, recorded_events().count());
+                // The correct event emited
+                let events = decode_events(start);
+                assert_transfer(&events[1], accounts.alice, accounts.bob, Id::U8(1));
+            }
+
+            #[ink::test]
             fn invalid_transfer_should_fail() {
                 let accounts = default_accounts::<E>();
                 // Create a new contract instance.
@@ -162,6 +187,24 @@ macro_rules! tests {
                 assert_eq!(token.balance_of(accounts.bob), 0);
                 // Eve owns 1 token.
                 assert_eq!(token.balance_of(accounts.eve), 1);
+            }
+
+            #[ink::test]
+            fn approve_emits_event() {                
+                let accounts = default_accounts::<E>();
+                let start = recorded_events().count();
+                // Create a new contract instance.
+                let mut token = $constructor();
+                // Create token Id 1.
+                assert_eq!(token.mint(Id::U8(1)), Ok(()));
+                // Token Id 1 is owned by Alice.
+                assert_eq!(token.owner_of(Id::U8(1)), Some(accounts.alice));
+                // Approve token Id 1 transfer for Bob on behalf of Alice.
+                assert_eq!(token.approve(accounts.bob, Some(Id::U8(1)), true), Ok(()));
+                // The event approve event takes place
+                assert_eq!(events.len(), 2);
+                let events = decode_events(start);
+                assert_approval(&events[1], accounts.alice, accounts.bob, Some(Id::U8(1)));
             }
 
             #[ink::test]
