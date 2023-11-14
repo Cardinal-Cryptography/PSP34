@@ -36,16 +36,19 @@ macro_rules! tests {
                 owner_: AccountId,
                 operator_: AccountId,
                 id_: Option<Id>,
+                approved_ : bool,
             ) {
                 if let Event::Approval(Approval {
                     owner,
                     operator,
                     id,
+                    approved,
                 }) = event
                 {
                     assert_eq!(*owner, owner_, "Approval event: 'owner' mismatch");
                     assert_eq!(*operator, operator_, "Approval event: 'operator' mismatch");
                     assert_eq!(*id, id_, "Approval event: 'id' mismatch");
+                    assert_eq!(*approved, approved_, "Approval event: 'approved' mismatch")
                 } else {
                     panic!("Event is not Approval")
                 }
@@ -202,9 +205,9 @@ macro_rules! tests {
                 // Approve token Id 1 transfer for Bob on behalf of Alice.
                 assert_eq!(token.approve(accounts.bob, Some(Id::U8(1)), true), Ok(()));
                 // The event approve event takes place
-                assert_eq!(events.len(), 2);
                 let events = decode_events(start);
-                assert_approval(&events[1], accounts.alice, accounts.bob, Some(Id::U8(1)));
+                assert_eq!(events.len(), 2);
+                assert_approval(&events[1], accounts.alice, accounts.bob, Some(Id::U8(1)), true);
             }
 
             #[ink::test]
@@ -346,7 +349,7 @@ macro_rules! tests {
             }
 
             fn set_caller(sender: AccountId) {
-                set_caller::<E>(sender);
+                ink::env::test::set_caller::<E>(sender);
             }
         }
     };
