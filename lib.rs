@@ -3,7 +3,7 @@
 mod data;
 mod errors;
 mod traits;
-mod tests;
+mod unit_tests;
 
 pub use data::{Id, PSP34Data, PSP34Event};
 pub use errors::PSP34Error;
