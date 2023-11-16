@@ -53,6 +53,10 @@ macro_rules! tests {
                     panic!("Event is not Approval")
                 }
             }
+            
+            fn set_caller(sender: AccountId) {
+                ink::env::test::set_caller::<E>(sender);
+            }
 
             #[ink::test]
             fn mint_works() {
@@ -102,7 +106,7 @@ macro_rules! tests {
                 assert_eq!(1, recorded_events().count());
                 // Alice transfers token 1 to Bob
                 assert_eq!(
-                    token.transfer(accounts.bob, Id::U8(1), ink::prelude::vec![u8::default()]),
+                    token.transfer(accounts.bob, Id::U8(1), vec![u8::default()]),
                     Ok(())
                 );
                 // The second Transfer event takes place
@@ -127,7 +131,7 @@ macro_rules! tests {
                 assert_eq!(1, recorded_events().count());
                 // Alice transfers token 1 to Bob
                 assert_eq!(
-                    token.transfer(accounts.bob, Id::U8(1), ink::prelude::vec![u8::default()]),
+                    token.transfer(accounts.bob, Id::U8(1), vec![u8::default()]),
                     Ok(())
                 );                
                 // The second Transfer event takes place
@@ -144,7 +148,7 @@ macro_rules! tests {
                 let mut token = $constructor();
                 // Transfer token fails if it does not exists.
                 assert_eq!(
-                    token.transfer(accounts.bob, Id::U8(2), ink::prelude::vec![u8::default()]),
+                    token.transfer(accounts.bob, Id::U8(2), vec![u8::default()]),
                     Err(PSP34Error::TokenNotExists)
                 );
                 // Token Id 2 does not exists.
@@ -159,7 +163,7 @@ macro_rules! tests {
                 set_caller(accounts.bob);
                 // Bob cannot transfer not owned tokens.
                 assert_eq!(
-                    token.transfer(accounts.eve, Id::U8(2), ink::prelude::vec![u8::default()]),
+                    token.transfer(accounts.eve, Id::U8(2), vec![u8::default()]),
                     Err(PSP34Error::NotApproved)
                 );
             }
@@ -179,7 +183,7 @@ macro_rules! tests {
                 set_caller(accounts.bob);
                 // Bob transfers token Id 1 from Alice to Eve.
                 assert_eq!(
-                    token.transfer(accounts.eve, Id::U8(1), ink::prelude::vec![u8::default()]),
+                    token.transfer(accounts.eve, Id::U8(1), vec![u8::default()]),
                     Ok(())
                 );
                 // TokenId 3 is owned by Eve.
@@ -229,7 +233,7 @@ macro_rules! tests {
                 set_caller(accounts.bob);
                 // Bob transfers token Id 1 from Alice to Eve.
                 assert_eq!(
-                    token.transfer(accounts.eve, Id::U8(1), ink::prelude::vec![u8::default()]),
+                    token.transfer(accounts.eve, Id::U8(1), vec![u8::default()]),
                     Ok(())
                 );
                 // TokenId 1 is owned by Eve.
@@ -238,7 +242,7 @@ macro_rules! tests {
                 assert_eq!(token.balance_of(accounts.alice), 1);
                 // Bob transfers token Id 2 from Alice to Eve.
                 assert_eq!(
-                    token.transfer(accounts.eve, Id::U8(2), ink::prelude::vec![u8::default()]),
+                    token.transfer(accounts.eve, Id::U8(2), vec![u8::default()]),
                     Ok(())
                 );
                 // Bob does not own tokens.
@@ -291,7 +295,7 @@ macro_rules! tests {
                 set_caller(accounts.eve);
                 // Eve is not an approved operator by Alice.
                 assert_eq!(
-                    token.transfer(accounts.frank, Id::U8(1), ink::prelude::vec![u8::default()]),
+                    token.transfer(accounts.frank, Id::U8(1), vec![u8::default()]),
                     Err(PSP34Error::NotApproved)
                 );
                 // Alice owns 1 token.
@@ -346,10 +350,6 @@ macro_rules! tests {
                     token.burn(accounts.alice, Id::U8(1)),
                     Err(PSP34Error::NotApproved)
                 );
-            }
-
-            fn set_caller(sender: AccountId) {
-                ink::env::test::set_caller::<E>(sender);
             }
         }
     };

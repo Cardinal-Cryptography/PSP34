@@ -156,6 +156,6 @@ mod token {
 
     #[cfg(test)]
     mod tests {
-        crate::tests!(Token, (|| Token::new()));
+        crate::tests!(Token, Token::new);
     }
 }
