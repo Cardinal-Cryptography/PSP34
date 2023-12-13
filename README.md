@@ -24,7 +24,7 @@ $ cargo contract build --release --features "contract"
 The `PSP34` trait contains all the methods defined in the PSP34 standard. The trait can be used together with ink!'s [`contract_ref`][contract_ref] macro to allow for convenient cross-contract calling.
 
 In your contract, if you would like to make a call to some other contract implementing the PSP34 standard, all you need to do is:
-```
+```rust
 use ink::contract_ref;
 use psp34::PSP34;
 
@@ -32,7 +32,7 @@ let mut token: contract_ref!(PSP34) = other_address.into();
 
 // Now `token` has all the PSP34 methods
 let balance = token.balance_of(some_account);
-token.transfer(recipient, value); // returns Result<(), PSP34Error>
+token.transfer(recipient, value, vec![]); // returns Result<(), PSP34Error>
 ```
 
 The same method can be used with other traits (`PSP34Metadata`, `PSP34Burnable`, `PSP34Mintable`) defined in this crate. See the contents of [`traits.rs`][traits].
@@ -53,7 +53,7 @@ The contract in [`lib.rs`][lib] contains an example implementation following all
 ### 4. Burnable and Mintable extensions
 
 The `PSP34Data` class contains also `burn` and `mint` methods, which can be used to implement `PSP34Burnable` and `PSP34Mintable` extensions and make your token burnable and/or mintable. An example implementation follows the same pattern as for the base trait:
-```
+```rust
 impl PSP34Burnable for Token {
     #[ink(message)]
     fn burn(&mut self, value: u128) -> Result<(), PSP34Error> {
@@ -65,7 +65,7 @@ impl PSP34Burnable for Token {
 }
 ```
 Please note that `PSP34Data` `burn` and `mint` methods do not enforce any form of access control. It's probably not a good idea to have a token which can be minted and burned by anyone anytime. When implementing Burnable and Mintable extensions, please make sure that their usage is restricted according to your project's business logic. For example:
-```
+```rust
 #[ink(storage)]
 pub struct Token {
     data: PSP34Data,
@@ -96,10 +96,38 @@ impl PSP34Burnable for Token {
 }
 ```
 
-### 5. Unit testing
+### 5. Enumerable extension
+
+Can be implemented by enabling `enumerable` feature enabled while compiling the contents of the reposiroty. To access its messages simply implement the `PSP34Enumerable` trait for your token:
+```rust
+#[ink(storage)]
+pub struct Token {
+    data: PSP34Data,
+}
+
+//...
+
+impl PSP34Enumerable for Token {
+    #[ink(message)]
+    fn owners_token_by_index(&self, owner: AccountId, index: u128) -> Result<Id, PSP34Error> {
+        self.data.owners_token_by_index(owner, index)
+    }
+
+    #[ink(message)]
+    fn token_by_index(&self, index: u128) -> Result<Id, PSP34Error> {
+        self.data.token_by_index(index)
+    }
+}
+```
+
+### 6. Metadata extension
+
+Within the crate's `metadata::Data` there is also a `set_attribute()` method. It is generally used in conjunction with `mint()` from the `PSP34Mintable`. Note that the `set_attribute()` method will emit the `AttributeSet` event.
+
+### 7. Unit testing
 
 This crate comes with a suite of unit tests for PSP34 tokens. It can be easily added to your contract's unit tests with a helper macro `tests!`. For the macro to work you need to implement `PSP34Burnable` and `PSP34Mintable` traits. The macro should be invoked inside the main contract's module (the one annotated with `#[ink::contract]`):
-```
+```rust
 #[ink::contract]
 mod mycontract {
     ...
@@ -108,15 +136,43 @@ mod mycontract {
     ...
     #[cfg(test)]
     mod tests { 
-        crate::tests!(Token, (|| Token::new()));
+        crate::tests!(Token, Token::new);
     }
 }
 ```
 As you can see in the code snippet above, the `tests!` macro takes two arguments. The first one should be a name of a struct which implements `PSP34` trait (usually your contract storage struct). The second argument should be a token constructor for the contract. In other words, the second argument should be a name of a function that returns the `PSP34` struct.
 
+## Implementation-Specific Details
+
+In certain scenarios, the PSP34 standard does not strictly define the behavior, and this section outlines the non-specified behavior in the current implementation. The methods discussed here can be found in [`data.rs`][data].
+
+### 1. Id type
+
+The type does not have a custom equals method implemented. Consequently `Id::U8(1)` is not equal to `Id::U16(1)`, for example.
+
+### 2. Approval
+
+The `approve()` method follows a "fall-through" approval logic for a single token. If an approved user calls this method, they will subsequently issue an approval for the owner's token to a third-party operator.
+
+This behavior does not extend to "blanket" approvals. Approving for all tokens only grants approval for the caller's owned tokens. Additionally, for enhanced security, `approve()` does not allow revoking approval for a single token when the operator is approved for all tokens using 
+```
+approve(caller, operator, None::<Id>, true)
+```
+
+### 3. Metadata
+
+The `set_attribute()` method recomended implementation is included into the [`metadata.rs`][metadata]
+It is a good practice to use the method together with `mint()` method.
+
+### 4. Balance of
+
+Return type of the `balance_of()` method is `u32`, while the `total_supply` value is `u128`, be warry of possible overflows.
+
+[data]: ./data.rs
 [lib]: ./lib.rs
 [traits]: ./traits.rs
 [ink]: https://use.ink
+[metadata]: ./metadata.rs
 [substrate]: https://substrate.io
 [cargo-contract]: https://github.com/paritytech/cargo-contract
 [erc721]: https://ethereum.org/en/developers/docs/standards/tokens/erc-721/
