@@ -115,7 +115,7 @@ mod token {
     impl PSP34 for Token {
         #[ink(message)]
         fn collection_id(&self) -> Id {
-            self.data.collection_id(self.env().caller())
+            self.data.collection_id(self.env().account_id())
         }
 
         #[ink(message)]
