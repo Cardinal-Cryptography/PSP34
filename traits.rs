@@ -1,5 +1,5 @@
 use ink::{
-    prelude::{string::String, vec::Vec},
+    prelude::vec::Vec,
     primitives::AccountId,
 };
 
@@ -117,6 +117,8 @@ pub trait PSP34Enumerable {
     #[ink(message)]
     fn owners_token_by_index(&self, owner: AccountId, index: u128) -> Result<Id, PSP34Error>;
 
+    /// Returns a token `Id` at a given `index` of all the tokens stored by the contract.
+    /// Use along with `total_supply` to enumerate all tokens.
     #[ink(message)]
     fn token_by_index(&self, index: u128) -> Result<Id, PSP34Error>;
 }
