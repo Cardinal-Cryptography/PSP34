@@ -1,13 +1,18 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
+mod balances;
 mod data;
 mod errors;
+mod metadata;
 mod traits;
 mod unit_tests;
 
 pub use data::{Id, PSP34Data, PSP34Event};
 pub use errors::PSP34Error;
 pub use traits::{PSP34Burnable, PSP34Metadata, PSP34Mintable, PSP34};
+
+#[cfg(feature = "enumerable")]
+pub use traits::PSP34Enumerable;
 
 // An example code of a smart contract using PSP34Data struct to implement
 // the functionality of PSP34 fungible token.
@@ -19,22 +24,31 @@ pub use traits::{PSP34Burnable, PSP34Metadata, PSP34Mintable, PSP34};
 // (4) implementing PSP34 trait based on PSP34Data methods
 // (5) properly emitting resulting events
 //
-// Implemented the optional PSP34Mintable (6) and PSP34Burnable (7) extensions
+// Implemented the optional PSP34Mintable (6), PSP34Burnable (7), and PSP34Metadata (8) extensions
 // and included unit tests (8).
+#[cfg(feature = "contract")]
 #[ink::contract]
 mod token {
-    use crate::{Id, PSP34Burnable, PSP34Data, PSP34Error, PSP34Event, PSP34Mintable, PSP34};
+    use crate::{
+        metadata, Id, PSP34Burnable, PSP34Data, PSP34Error, PSP34Event, PSP34Metadata,
+        PSP34Mintable, PSP34,
+    };
+
+    #[cfg(feature = "enumerable")]
+    use crate::PSP34Enumerable;
 
     #[ink(storage)]
     pub struct Token {
-        data: PSP34Data, // (1)
+        data: PSP34Data,          // (1)
+        metadata: metadata::Data, // (8)
     }
 
     impl Token {
         #[ink(constructor)]
         pub fn new() -> Self {
             Self {
-                data: PSP34Data::new(), // (2)
+                data: PSP34Data::new(),              // (2)
+                metadata: metadata::Data::default(), // (8)
             }
         }
 
@@ -93,15 +107,15 @@ mod token {
     #[ink(event)]
     pub struct AttributeSet {
         id: Id,
-        key: ink::prelude::string::String,
-        data: ink::prelude::string::String,
+        key: Vec<u8>,
+        data: Vec<u8>,
     }
 
     // (4)
     impl PSP34 for Token {
         #[ink(message)]
         fn collection_id(&self) -> Id {
-            self.data.collection_id(self.env().caller())
+            self.data.collection_id(self.env().account_id())
         }
 
         #[ink(message)]
@@ -110,7 +124,7 @@ mod token {
         }
 
         #[ink(message)]
-        fn balance_of(&self, owner: AccountId) -> u128 {
+        fn balance_of(&self, owner: AccountId) -> u32 {
             self.data.balance_of(owner)
         }
 
@@ -176,6 +190,14 @@ mod token {
     }
 
     // (8)
+    impl PSP34Metadata for Token {
+        #[ink(message)]
+        fn get_attribute(&self, id: Id, key: Vec<u8>) -> Option<Vec<u8>> {
+            self.metadata.get_attribute(id, key)
+        }
+    }
+
+    // (9)
     #[cfg(test)]
     mod tests {
         crate::tests!(Token, Token::new);

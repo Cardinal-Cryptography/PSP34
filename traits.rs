@@ -1,5 +1,5 @@
 use ink::{
-    prelude::{string::String, vec::Vec},
+    prelude::vec::Vec,
     primitives::AccountId,
 };
 
@@ -22,7 +22,7 @@ pub trait PSP34 {
     ///
     /// This represents the amount of unique tokens the owner has.
     #[ink(message)]
-    fn balance_of(&self, owner: AccountId) -> u128;
+    fn balance_of(&self, owner: AccountId) -> u32;
 
     /// Returns `true` if the operator is approved by the owner to withdraw `id` token.
     ///
@@ -73,7 +73,7 @@ pub trait PSP34Metadata {
     ///
     /// If `id` is a collection id of the token, it returns attributes for collection.
     #[ink(message)]
-    fn get_attribute(&self, id: Id, key: String) -> Option<String>;
+    fn get_attribute(&self, id: Id, key: Vec<u8>) -> Option<Vec<u8>>;
 }
 
 #[ink::trait_definition]
@@ -107,4 +107,18 @@ pub trait PSP34Burnable {
     /// Reverts with `TokenExists` if token id is already in the library.
     #[ink(message)]
     fn burn(&mut self, account: AccountId, id: Id) -> Result<(), PSP34Error>;
+}
+
+#[cfg(feature = "enumerable")]
+#[ink::trait_definition]
+pub trait PSP34Enumerable {
+    /// Returns a token `Id` owned by `owner` at a given `index` of its token list.
+    /// Use along with `balance_of` to enumerate all of ``owner``'s tokens.
+    #[ink(message)]
+    fn owners_token_by_index(&self, owner: AccountId, index: u128) -> Result<Id, PSP34Error>;
+
+    /// Returns a token `Id` at a given `index` of all the tokens stored by the contract.
+    /// Use along with `total_supply` to enumerate all tokens.
+    #[ink(message)]
+    fn token_by_index(&self, index: u128) -> Result<Id, PSP34Error>;
 }

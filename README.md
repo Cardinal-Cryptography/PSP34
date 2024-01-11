@@ -1,5 +1,7 @@
 # PSP34 Non-Fungible Token
 
+**Note that both the implementation and the psp34 standard are under development and are subjected to change. Not production-ready as of yet.**
+
 PSP34 is a non-fungible token standard for WebAssembly smart contracts running on blockchains based on the [Substrate][substrate] framework. It is an equivalent of Ethereum's [ERC-721][erc721]. The definition of the PSP34 standard can be found [here][psp34].
 
 This repository contains a simple, minimal implementation of the PSP34 token in [ink!][ink] programming language.
@@ -98,7 +100,9 @@ impl PSP34Burnable for Token {
 
 ### 5. Enumerable extension
 
-Can be implemented by enabling `enumerable` feature enabled while compiling the contents of the reposiroty. To access its messages simply implement the `PSP34Enumerable` trait for your token:
+This is an optional extension that allows enumerating tokens on the chain. Enabling the extension will introduce a large gas overhead.
+
+Can be implemented by enabling `enumerable` feature enabled while compiling the contents of the repository. To access its messages simply implement the `PSP34Enumerable` trait for your token:
 ```rust
 #[ink(storage)]
 pub struct Token {
@@ -161,12 +165,12 @@ approve(caller, operator, None::<Id>, true)
 
 ### 3. Metadata
 
-The `set_attribute()` method recomended implementation is included into the [`metadata.rs`][metadata]
+The `set_attribute()` method recommended implementation is included into the [`metadata.rs`][metadata]
 It is a good practice to use the method together with `mint()` method.
 
 ### 4. Balance of
 
-Return type of the `balance_of()` method is `u32`, while the `total_supply` value is `u128`, be warry of possible overflows.
+Return type of the `balance_of()` method is `u32`, while the `total_supply` value is `u128`, be wary of possible overflows.
 
 [data]: ./data.rs
 [lib]: ./lib.rs

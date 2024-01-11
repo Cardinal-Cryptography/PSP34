@@ -1,3 +1,4 @@
+use crate::balances::balance_manager::Balances;
 use crate::PSP34Error;
 use ink::{
     prelude::{string::String, vec, vec::Vec},
@@ -39,8 +40,8 @@ pub enum PSP34Event {
     },
     AttributeSet {
         id: Id,
-        key: String,
-        data: String,
+        key: Vec<u8>,
+        data: Vec<u8>,
     },
 }
 
@@ -60,9 +61,8 @@ pub enum PSP34Event {
 #[derive(Debug, Default)]
 pub struct PSP34Data {
     token_owner: Mapping<Id, AccountId>,
-    owned_tokens_count: Mapping<AccountId, u128>,
     operator_approvals: Mapping<(AccountId, AccountId, Option<Id>), ()>,
-    total_supply: u128,
+    balance: Balances,
 }
 
 impl PSP34Data {
@@ -73,11 +73,11 @@ impl PSP34Data {
     }
 
     pub fn total_supply(&self) -> u128 {
-        self.total_supply
+        self.balance.total_supply()
     }
 
-    pub fn balance_of(&self, owner: AccountId) -> u128 {
-        self.owned_tokens_count.get(owner).unwrap_or_default()
+    pub fn balance_of(&self, owner: AccountId) -> u32 {
+        self.balance.balance_of(&owner)
     }
 
     pub fn owner_of(&self, id: &Id) -> Option<AccountId> {
@@ -157,20 +157,13 @@ impl PSP34Data {
             return Err(PSP34Error::NotApproved);
         }
 
-        let from_balance = self.balance_of(owner);
-        if from_balance == 1 {
-            self.owned_tokens_count.remove(owner);
-        } else {
-            self.owned_tokens_count
-                .insert(owner, &(from_balance.checked_sub(1).unwrap()));
-        }
+        self.balance.decrease_balance(&owner, &id, false);
+
         self.operator_approvals.remove((owner, caller, Some(&id)));
         self.token_owner.remove(&id);
 
         self.token_owner.insert(&id, &to);
-        let to_balance = self.balance_of(to);
-        self.owned_tokens_count
-            .insert(to, &(to_balance.checked_add(1).unwrap()));
+        self.balance.increase_balance(&to, &id, false)?;
 
         Ok(vec![PSP34Event::Transfer {
             from: Some(caller),
@@ -184,15 +177,7 @@ impl PSP34Data {
         if self.owner_of(&id).is_some() {
             return Err(PSP34Error::TokenExists);
         }
-        let new_supply =
-            self.total_supply
-                .checked_add(1)
-                .ok_or(PSP34Error::Custom(String::from(
-                    "Max PSP34 supply exceeded. Max supply limited to 2^128-1.",
-                )))?;
-        self.total_supply = new_supply;
-        let new_balance = self.balance_of(account).saturating_add(1);
-        self.owned_tokens_count.insert(account, &new_balance);
+        self.balance.increase_balance(&account, &id, true)?;
         self.token_owner.insert(&id, &account);
 
         Ok(vec![PSP34Event::Transfer {
@@ -215,14 +200,8 @@ impl PSP34Data {
         if account != caller && !self.allowance(caller, account, None) {
             return Err(PSP34Error::NotApproved);
         }
+        self.balance.decrease_balance(&account, &id, true);
         self.token_owner.remove(&id);
-        let new_balance = self.balance_of(account).saturating_sub(1);
-        if new_balance == 0 {
-            self.owned_tokens_count.remove(account);
-        } else {
-            self.owned_tokens_count.insert(account, &new_balance);
-        }
-        self.total_supply = self.total_supply.saturating_sub(1);
 
         Ok(vec![PSP34Event::Transfer {
             from: Some(account),
@@ -230,10 +209,33 @@ impl PSP34Data {
             id,
         }])
     }
+
+    #[cfg(feature = "enumerable")]
+    pub fn owners_token_by_index(&self, owner: AccountId, index: u128) -> Result<Id, PSP34Error> {
+        self.balance.owners_token_by_index(owner, index)
+    }
+
+    #[cfg(feature = "enumerable")]
+    pub fn token_by_index(&self, index: u128) -> Result<Id, PSP34Error> {
+        self.balance.token_by_index(index)
+    }
 }
 
 impl Default for Id {
     fn default() -> Self {
-        Self::U8(0)
+        Self::U128(0)
+    }
+}
+
+impl From<Id> for u128 {
+    fn from(id: Id) -> Self {
+        match id {
+            Id::U8(val) => val as u128,
+            Id::U16(val) => val as u128,
+            Id::U32(val) => val as u128,
+            Id::U64(val) => val as u128,
+            Id::U128(val) => val,
+            Id::Bytes(val) => u128::from_be_bytes(val.as_slice().try_into().unwrap()),
+        }
     }
 }
