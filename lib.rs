@@ -3,7 +3,7 @@
 mod balances;
 mod data;
 mod errors;
-mod metadata;
+pub mod metadata;
 mod traits;
 mod unit_tests;
 
