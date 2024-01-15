@@ -26,6 +26,7 @@ pub use traits::PSP34Enumerable;
 //
 // Implemented the optional PSP34Mintable (6), PSP34Burnable (7), and PSP34Metadata (8) extensions
 // and included unit tests (8).
+
 #[cfg(feature = "contract")]
 #[ink::contract]
 mod token {
@@ -33,6 +34,7 @@ mod token {
         metadata, Id, PSP34Burnable, PSP34Data, PSP34Error, PSP34Event, PSP34Metadata,
         PSP34Mintable, PSP34,
     };
+    use ink::prelude::vec::Vec;
 
     #[cfg(feature = "enumerable")]
     use crate::PSP34Enumerable;

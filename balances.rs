@@ -2,6 +2,7 @@
 pub mod balance_manager {
     use crate::{data::Id, PSP34Error};
     use ink::{primitives::AccountId, storage::Mapping};
+    use ink::prelude::string::String;
 
     #[ink::storage_item]
     #[derive(Default, Debug)]
