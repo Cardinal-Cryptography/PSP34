@@ -194,7 +194,7 @@ impl PSP34Data {
         account: AccountId,
         id: Id,
     ) -> Result<Vec<PSP34Event>, PSP34Error> {
-        let owner = self.owner_of(&id)ok_or(PSP34Error::TokenNotExists)?;
+        let owner = self.owner_of(&id).ok_or(PSP34Error::TokenNotExists)?;
 
         if owner != caller && !self.allowance(owner, caller, None) {
             return Err(PSP34Error::NotApproved);
