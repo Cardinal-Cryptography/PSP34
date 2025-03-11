@@ -194,12 +194,12 @@ impl PSP34Data {
         account: AccountId,
         id: Id,
     ) -> Result<Vec<PSP34Event>, PSP34Error> {
-        if self.owner_of(&id).is_none() {
-            return Err(PSP34Error::TokenNotExists);
-        }
-        if account != caller && !self.allowance(caller, account, None) {
+        let owner = self.owner_of(&id).ok_or(PSP34Error::TokenNotExists)?;
+
+        if owner != caller && !self.allowance(owner, caller, None) {
             return Err(PSP34Error::NotApproved);
         }
+
         self.balance.decrease_balance(&account, &id, true);
         self.token_owner.remove(&id);
 
