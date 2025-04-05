@@ -11,8 +11,9 @@ use ink::storage::traits::StorageLayout;
 
 /// Type for a PSP34 token id.
 /// Contains all the possible permutations of id according to the standard.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, scale::Encode, scale::Decode)]
-#[cfg_attr(feature = "std", derive(scale_info::TypeInfo, StorageLayout))]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[cfg_attr(feature = "std", derive(StorageLayout))]
+#[ink::scale_derive(Encode, Decode, TypeInfo)]
 pub enum Id {
     U8(u8),
     U16(u16),

@@ -1,6 +1,6 @@
 [package]
 name = "psp34"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 authors = ["Cardinal"]
 homepage = "https://github.com/Cardinal-Cryptography/PSP34"
@@ -13,10 +13,7 @@ keywords = ["smart-contract", "token", "PSP34", "ink"]
 categories = ["cryptography::cryptocurrencies", "wasm"]
 
 [dependencies]
-ink = { version = "4.3", default-features = false }
-
-scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
-scale-info = { version = "2.9", default-features = false, features = ["derive"], optional = true }
+ink = { version = "5.0.0", default-features = false }
 
 [lib]
 path = "lib.rs"
@@ -25,10 +22,7 @@ path = "lib.rs"
 default = ["std"]
 std = [
     "ink/std",
-    "scale/std",
-    "scale-info/std",
 ]
 
 enumerable = []
-contract = []
 ink-as-dependency = []

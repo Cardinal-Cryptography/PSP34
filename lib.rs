@@ -27,7 +27,6 @@ pub use traits::PSP34Enumerable;
 // Implemented the optional PSP34Mintable (6), PSP34Burnable (7), and PSP34Metadata (8) extensions
 // and included unit tests (8).
 
-#[cfg(feature = "contract")]
 #[ink::contract]
 mod token {
     use crate::{
